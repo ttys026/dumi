@@ -14,7 +14,7 @@ export interface IDumiDemoProps {
   previewerProps: Omit<IPreviewerProps, 'asset' | 'children'>;
 }
 
-const DemoErrorBoundary: FC<{ children: ReactNode }> = (props) => (
+const DemoErrorBoundary: FC<{ children: ReactNode }> = props => (
   <ErrorBoundary
     fallbackRender={({ error }: any) => (
       <Container type="error">
@@ -36,34 +36,37 @@ const DemoErrorBoundary: FC<{ children: ReactNode }> = (props) => (
   </ErrorBoundary>
 );
 
-export const DumiDemo: FC<IDumiDemoProps> = (props) => {
+export const DumiDemo: FC<IDumiDemoProps> = props => {
   const { demos, historyType } = useSiteData();
   const { basename } = useAppData();
   const { component, asset } = demos[props.demo.id];
 
   // hide debug demo in production
-  if (process.env.NODE_ENV === 'production' && props.previewerProps.debug)
-    return null;
+  if (process.env.NODE_ENV === 'production' && props.previewerProps.debug) return null;
 
   if (props.demo.inline) {
     return <DemoErrorBoundary>{createElement(component)}</DemoErrorBoundary>;
   }
 
   const isHashRoute = historyType === 'hash';
+  // allow user override demoUrl by frontmatter
+  let demoUrl =
+    props.previewerProps.demoUrl ||
+    // when use hash route, browser can automatically handle relative paths starting with #
+    `${isHashRoute ? `#` : ''}${basename}${SP_ROUTE_PREFIX}demos/${props.demo.id}`;
+
+  if (!isHashRoute) {
+    const [, prefix = '', demoId] =
+      new RegExp(`(.*)${SP_ROUTE_PREFIX}demos/(.*)$`).exec(props.previewerProps.demoUrl || '') ||
+      [];
+    if (demoId) {
+      // encode demoId to avoid slash in id, which breaks the route
+      demoUrl = `${prefix}${SP_ROUTE_PREFIX}demos/${encodeURIComponent(demoId)}`;
+    }
+  }
 
   return (
-    <Previewer
-      asset={asset}
-      demoUrl={
-        // allow user override demoUrl by frontmatter
-        props.previewerProps.demoUrl ||
-        // when use hash route, browser can automatically handle relative paths starting with #
-        `${isHashRoute ? `#` : ''}${basename}${SP_ROUTE_PREFIX}demos/${
-          props.demo.id
-        }`
-      }
-      {...props.previewerProps}
-    >
+    <Previewer asset={asset} demoUrl={demoUrl} {...props.previewerProps}>
       {props.previewerProps.iframe ? null : (
         <DemoErrorBoundary>{createElement(component)}</DemoErrorBoundary>
       )}
